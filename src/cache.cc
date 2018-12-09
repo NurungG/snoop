@@ -11,62 +11,62 @@ static int num_of_bits(int num) {
     return ret;
 }
 
-ppc::ppc(int _cap, int _ways, int _block_sz) : cap(_cap), n_way(_ways), block_sz(_block_sz) {
-    this->cap <<= 10; // scale up
+pcc::pcc(int _cap, int _ways, int _block_sz) : cap(_cap), n_way(_ways), block_sz(_block_sz) {
+    cap <<= 10; // scale up
 
-    this->n_entry = this->cap / this->block_sz;
-    this->n_set   = this->n_entry / this->n_way;
+    n_entry = cap / block_sz;
+    n_set   = n_entry / n_way;
 
-    this->b_offset = num_of_bits(this->block_sz);
-    this->b_index  = num_of_bits(this->cap / this->n_way / this->block_sz);
-    this->b_tag    = 64 - this->b_offset - this->b_offset;
+    b_offset = num_of_bits(block_sz);
+    b_index  = num_of_bits(cap / n_way / block_sz);
+    b_tag    = 64 - b_offset - b_offset;
 
-    this->offset_mask = UINT64_MAX >> (64 - this->b_offset);
-    this->tag_mask    = UINT64_MAX << (64 - this->b_tag);
-    this->index_mask  = ( UINT64_MAX ^ this->offset_mask ) & ( UINT64_MAX ^ this->tag_mask);
+    offset_mask = UINT64_MAX >> (64 - b_offset);
+    tag_mask    = UINT64_MAX << (64 - b_tag);
+    index_mask  = ( UINT64_MAX ^ offset_mask ) & ( UINT64_MAX ^ tag_mask);
 
     // Allocate cache
-    this->way = new struct cache_way [this->n_way];
-    this->set = new struct cache_set [this->n_set];
+    way = new struct cache_way [n_way];
+    set = new struct cache_set [n_set];
 
-    for (int i = 0; i < this->n_way; i++) {
-        this->way[i].tbl = new struct cache_entry [this->n_set];
+    for (int i = 0; i < n_way; i++) {
+        way[i].tbl = new struct cache_entry [n_set];
     }
-    for (int i = 0; i < this->n_set; i++) {
-        this->set[i].ptr = new struct cache_entry * [this->n_way];
-        this->set[i].lru = lru_init(this->n_way);
+    for (int i = 0; i < n_set; i++) {
+        set[i].ptr = new struct cache_entry * [n_way];
+        set[i].lru = lru_init(n_way);
 
         // Initialize cache entries
-        for (int j = 0; j < this->n_way; j++) {
-            this->set[i].ptr[j] = &this->way[j].tbl[i];
-            this->set[i].ptr[j]->is_valid = false;
-            this->set[i].ptr[j]->lru_ptr =
-                    lru_push(this->set[i].lru, (void *)this->set[i].ptr[j]);
+        for (int j = 0; j < n_way; j++) {
+            set[i].ptr[j] = &way[j].tbl[i];
+            set[i].ptr[j]->is_valid = false;
+            set[i].ptr[j]->lru_ptr =
+                    lru_push(set[i].lru, (void *)set[i].ptr[j]);
         }
     }
 }
 
-ppc::~ppc() {
-    for (int i = 0; i < this->n_way; i++) {
-        delete [] this->way[i].tbl;
+pcc::~pcc() {
+    for (int i = 0; i < n_way; i++) {
+        delete [] way[i].tbl;
     }
-    for (int i = 0; i < this->n_set; i++) {
-        lru_free(this->set[i].lru);
+    for (int i = 0; i < n_set; i++) {
+        lru_free(set[i].lru);
     }
 
-    delete [] this->way;
-    delete [] this->set;
+    delete [] way;
+    delete [] set;
 }
 
-static inline uint64_t get_index(ppc *cache, uint64_t addr) {
+static inline uint64_t get_index(pcc *cache, uint64_t addr) {
     return ( ( addr & cache->index_mask ) >> cache->b_offset );
 }
 
-static inline uint64_t get_tag(ppc *cache, uint64_t addr) {
+static inline uint64_t get_tag(pcc *cache, uint64_t addr) {
     return ( ( addr & cache->tag_mask ) >> ( 64 - cache->b_tag ) );
 }
 
-static void check_cache(ppc *cache, struct cache_entry **target, struct cache_set *set, uint64_t tag, bool *is_hit, bool *is_full) {
+static void check_cache(pcc *cache, struct cache_entry **target, struct cache_set *set, uint64_t tag, bool *is_hit, bool *is_full) {
     struct cache_entry *iter;
 
     // Check cache hit or miss
@@ -87,7 +87,7 @@ static void check_cache(ppc *cache, struct cache_entry **target, struct cache_se
     }
 }
 
-static void evict_victim(ppc *cache, struct cache_entry **target, struct cache_set *set) {
+static void evict_victim(pcc *cache, struct cache_entry **target, struct cache_set *set) {
     *target = (cache_entry *)lru_get_victim(set->lru);
     if ((*target)->is_dirty) {
         ++cache->dirty_evict;
@@ -107,7 +107,7 @@ static void read_data(struct cache_entry **target, uint64_t tag) {
     // (*target)->data <= memory
 }
 
-int ppc::read(uint64_t addr) {
+int pcc::read(uint64_t addr) {
     struct cache_set *set;
     uint64_t tag;
 
@@ -116,15 +116,15 @@ int ppc::read(uint64_t addr) {
     bool is_hit  = false;
     bool is_full = true;
 
-    set = &this->set[get_index(this, addr)];
+    set = &set[get_index(this, addr)];
     tag = get_tag(this, addr);
 
-    ++this->read_cnt;
+    ++read_cnt;
 
     check_cache(this, &target, set, tag, &is_hit, &is_full);
 
     if (!is_hit) {
-        ++this->read_miss;
+        ++read_miss;
         if (is_full) {
             evict_victim(this, &target, set);
         }
@@ -137,7 +137,7 @@ int ppc::read(uint64_t addr) {
     return 0;
 }
 
-int ppc::write(uint64_t addr) {
+int pcc::write(uint64_t addr) {
     struct cache_set *set;
     uint64_t tag;
 
@@ -146,15 +146,15 @@ int ppc::write(uint64_t addr) {
     bool is_hit  = false;
     bool is_full = true;
 
-    set = &this->set[get_index(this, addr)];
+    set = &set[get_index(this, addr)];
     tag = get_tag(this, addr);
 
-    ++this->write_cnt;
+    ++write_cnt;
 
     check_cache(this, &target, set, tag, &is_hit, &is_full);
 
     if (!is_hit) {
-        ++this->write_miss;
+        ++write_miss;
         if (is_full) {
             evict_victim(this, &target, set);
         }
@@ -167,5 +167,48 @@ int ppc::write(uint64_t addr) {
     // Mark as dirty
     target->is_dirty = true;
 
-    return 1;
+    return 0;
+}
+
+int pcc::mark_shared(uint64_t addr) {
+    struct cache_set *set;
+    uint64_t tag;
+
+    struct cache_entry *target;
+
+    bool is_hit  = false;
+    bool is_full = true;
+
+    set = &set[get_index(this, addr)];
+    tag = get_tag(this, addr);
+
+    check_cache(this, &target, set, tag, &is_hit, &is_full);
+
+    if (!is_hit) return 1;
+
+    target->is_shared = true;
+
+    return 0;
+}
+
+int pcc::mark_invalid(uint64_t addr) {
+    struct cache_set *set;
+    uint64_t tag;
+
+    struct cache_entry *target;
+
+    bool is_hit  = false;
+    bool is_full = true;
+
+    set = &set[get_index(this, addr)];
+    tag = get_tag(this, addr);
+
+    check_cache(this, &target, set, tag, &is_hit, &is_full);
+
+    if (!is_hit) return 1;
+
+    target->is_invalid = true;
+    lru_update_inverse(set->lru, target->lru_ptr);
+    
+    return 0;
 }

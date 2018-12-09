@@ -20,6 +20,7 @@ int lru_free(struct lru_list *list);
 struct lru_node *lru_push(struct lru_list *list, void *value);
 void *lru_pop(struct lru_list *list);
 int lru_update(struct lru_list *list, struct lru_node *pos);
+int lru_update_inverse(struct lru_list *list, struct lru_node *pos);
 void *lru_front(struct lru_list *list);
 void *lru_back(struct lru_list *list);
 void *lru_get_victim(struct lru_list *list);

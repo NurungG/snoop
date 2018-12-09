@@ -5,11 +5,15 @@
 
 #include "lru.h"
 
+#define BUS_WAIT 1
+#define BUS_OCCU 2
+
 
 struct cache_entry {
     uint64_t tag;
     bool is_valid;
     bool is_dirty;
+    bool is_shared;
 
     //char data[BLOCK_SIZE];
 
@@ -26,7 +30,7 @@ struct cache_set {
 };
 
 /** Per Core Cache */
-class ppc {
+class pcc {
 public:
     /** Cache management core */
     struct cache_way *way;
@@ -62,10 +66,12 @@ public:
 
     uint64_t checksum;
 
-    ppc(int, int, int);
-    ~ppc();
+    pcc(int, int, int);
+    ~pcc();
     int read(uint64_t addr);
     int write(uint64_t addr);
+    int mark_shared(uint64_t addr);
+    int mark_invalid(uint64_t addr);
 };
 
 #endif

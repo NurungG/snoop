@@ -62,11 +62,14 @@ static int do_simulate(struct snoop_ctx *ctx) {
     if (ctx->prtcl == 0) {
         msi simulator(ctx->cores, ctx->cap, ctx->ways, 64);
 
-        for (int i = 0; i < simulator.n_core; i++) {
-            if (!simulator.is_busy && ctx->core[i] >> op >> hex >> addr >> dec) {
-                if (op == 'R') simulator.read(i, addr);
-                else if (op == 'W') simulator.write(i, addr);
+        while (!stop_flag) {
+            for (int i = 0; i < simulator.n_core; i++) {
+                if (!simulator.is_busy[i] && ctx->core[i] >> op >> hex >> addr >> dec) {
+                    if (op == 'R') simulator.read(i, addr);
+                    else if (op == 'W') simulator.write(i, addr);
+                }
             }
+            simulator.check_bus();
         }
     } else if (ctx->prtcl == 1) {
         //mesi simualtor(ctx->cores, ctx->cap, ctx->ways, 64);

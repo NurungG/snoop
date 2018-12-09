@@ -73,6 +73,17 @@ int lru_update(struct lru_list *list, struct lru_node *pos) {
     return 0;
 }
 
+int lru_update_inverse(struct lru_list *list, struct struct lru_node *pos) {
+    pos->prev->next = pos->next;
+    pos->next->prev = pos->prev;
+
+    pos->next = list->head;
+    pos->prev = list->head->prev;
+
+    pos->next->prev = pos;
+    pos->prev->next = pos;
+}
+
 void *lru_front(struct lru_list *list) {
     return list->head->next->value;
 }
