@@ -43,7 +43,7 @@ static int open_trace(struct snoop_ctx *ctx) {
 
     for (int i = 0; i < ctx->cores; i++) {
         stringstream ss;
-        ss << "core_" << i << "_" << ctx->cores << ".out";
+        ss << "trace/core_" << i << "_" << ctx->cores << ".out";
         string file = ss.str();
 #if DEBUG
         cout << file << " is openning" << endl;
@@ -59,6 +59,20 @@ static int open_trace(struct snoop_ctx *ctx) {
 }
 
 static int do_simulate(struct snoop_ctx *ctx) {
+    if (ctx->prtcl == 0) {
+        msi simulator(ctx->cores, ctx->cap, ctx->ways, 64);
+
+        for (int i = 0; i < simulator.n_core; i++) {
+            if (!simulator.is_busy && ctx->core[i] >> op >> hex >> addr >> dec) {
+                if (op == 'R') simulator.read(i, addr);
+                else if (op == 'W') simulator.write(i, addr);
+            }
+        }
+    } else if (ctx->prtcl == 1) {
+        //mesi simualtor(ctx->cores, ctx->cap, ctx->ways, 64);
+    } else {
+
+    }
     return 0;
 }
 
